@@ -9,3 +9,4 @@ coverage
 tests
 .vscode
 .cursor
+*.log

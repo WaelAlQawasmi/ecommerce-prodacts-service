@@ -66,16 +66,19 @@ services:
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - bootstrap.memory_lock=false
+      - ES_JAVA_OPTS=${ES_JAVA_OPTS:--Xms256m -Xmx256m}
     ports:
       - "9200:9200"
     volumes:
       - es_data:/usr/share/elasticsearch/data
+    mem_limit: ${ES_MEM_LIMIT:-512m}
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\\|yellow\"'"]
       interval: 10s
       timeout: 10s
-      retries: 10
+      retries: 15
+      start_period: 60s
 
   kafka:
     image: bitnamilegacy/kafka:3.7.0-debian-12-r7
@@ -90,6 +93,8 @@ services:
       KAFKA_CFG_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
       KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_HEAP_OPTS: ${KAFKA_HEAP_OPTS:--Xmx256m -Xms256m}
+    mem_limit: ${KAFKA_MEM_LIMIT:-512m}
     volumes:
       - kafka_data:/bitnami/kafka
 

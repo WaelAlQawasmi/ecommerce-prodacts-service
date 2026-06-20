@@ -73,6 +73,32 @@ if ! $DOCKER_COMPOSE version >/dev/null 2>&1; then
   exit 1
 fi
 
+if [[ -z "${COMPOSE_FILE:-}" ]] && command -v free >/dev/null 2>&1; then
+  total_mb=$(free -m | awk '/^Mem:/{print $2}')
+  if [[ "$total_mb" -lt 2048 ]]; then
+    export COMPOSE_FILE="docker-compose.yml:docker-compose.small.yml"
+    echo "Low memory detected (${total_mb}MB RAM) — using docker-compose.small.yml"
+    echo "Tip: use a 4GB+ instance for production, or add 2GB swap (see README)."
+  fi
+fi
+
+check_disk_space() {
+  local min_mb="${1:-4096}"
+  local avail_kb avail_mb
+  avail_kb=$(df -Pk . | awk 'NR==2 {print $4}')
+  avail_mb=$((avail_kb / 1024))
+  if [[ "$avail_mb" -lt "$min_mb" ]]; then
+    echo "Not enough disk space: ${avail_mb}MB free (need at least ${min_mb}MB)." >&2
+    echo "Check usage:  df -h && docker system df" >&2
+    echo "Free Docker:  docker system prune -a" >&2
+    echo "Free builds:  docker builder prune -a" >&2
+    exit 1
+  fi
+  echo "Disk space OK: ${avail_mb}MB free."
+}
+
+check_disk_space 4096
+
 echo "==> Pulling infrastructure images..."
 $DOCKER_COMPOSE pull postgres redis elasticsearch kafka
 

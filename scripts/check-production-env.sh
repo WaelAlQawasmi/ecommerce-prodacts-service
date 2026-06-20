@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 PLACEHOLDER='YOUR_RSA_PUBLIC_KEY_HERE'
-REQUIRED=(DATABASE_URL REDIS_URL ELASTICSEARCH_NODE PASSPORT_PUBLIC_KEY)
+REQUIRED=(DATABASE_URL REDIS_URL PASSPORT_PUBLIC_KEY)
 
 if [[ ! -f .env ]]; then
   if [[ ! -f .env.example ]]; then
@@ -65,6 +65,14 @@ for key in "${REQUIRED[@]}"; do
     failed=true
   fi
 done
+
+es_enabled="$(get_env ELASTICSEARCH_ENABLED || echo true)"
+if [[ "$es_enabled" != "false" && "$es_enabled" != "0" ]]; then
+  if ! es_node="$(get_env ELASTICSEARCH_NODE)" || [[ -z "$es_node" ]]; then
+    echo 'Missing required variable: ELASTICSEARCH_NODE (or set ELASTICSEARCH_ENABLED=false)' >&2
+    failed=true
+  fi
+fi
 
 if [[ "$failed" == true ]]; then
   exit 1

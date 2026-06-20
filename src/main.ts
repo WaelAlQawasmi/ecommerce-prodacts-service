@@ -8,6 +8,8 @@ import { PrismaCategoryRepository } from './infrastructure/persistence/PrismaCat
 import { PrismaProductRepository } from './infrastructure/persistence/PrismaProductRepository';
 import { PrismaStockRepository } from './infrastructure/persistence/PrismaStockRepository';
 import { ElasticsearchProductSearchRepository } from './infrastructure/search/ElasticsearchProductSearchRepository';
+import { PrismaProductSearchRepository } from './infrastructure/search/PrismaProductSearchRepository';
+import { ProductSearchRepository } from './domain/product/ProductSearchRepository';
 import { GrpcStockServer } from './infrastructure/grpc/GrpcStockServer';
 import {
   createKafkaClient,
@@ -36,18 +38,23 @@ async function bootstrap(): Promise<void> {
   const config = loadConfig();
   const prisma = new PrismaClient();
   const redis = new Redis(config.redisUrl);
-  const elasticsearch = new ElasticsearchClient({ node: config.elasticsearchNode });
 
   const categoryRepository = new PrismaCategoryRepository(prisma);
   const productRepository = new PrismaProductRepository(prisma);
   const stockRepository = new PrismaStockRepository(prisma, redis);
-  const searchRepository = new ElasticsearchProductSearchRepository(
-    elasticsearch,
-    config.elasticsearchIndex,
-    productRepository,
-  );
+  const searchRepository: ProductSearchRepository = config.elasticsearchEnabled
+    ? new ElasticsearchProductSearchRepository(
+        new ElasticsearchClient({ node: config.elasticsearchNode }),
+        config.elasticsearchIndex,
+        productRepository,
+      )
+    : new PrismaProductSearchRepository(prisma);
 
   await searchRepository.ensureIndex();
+
+  if (!config.elasticsearchEnabled) {
+    console.log('Elasticsearch disabled — product search uses PostgreSQL.');
+  }
 
   const jwtVerifier = new JwtVerifier(config.passportPublicKey);
 
@@ -79,14 +86,19 @@ async function bootstrap(): Promise<void> {
   const grpcServer = new GrpcStockServer(stockRepository, config.stockReservationTtlSeconds);
   await grpcServer.start(config.grpcPort);
 
-  const kafka = createKafkaClient(config.kafkaBrokers, config.kafkaClientId);
-  const stockReleaseConsumer = new StockReleaseConsumer(
-    kafka,
-    config.kafkaGroupId,
-    config.kafkaStockReleaseTopic,
-    stockRepository,
-  );
-  await stockReleaseConsumer.start();
+  let stockReleaseConsumer: StockReleaseConsumer | null = null;
+  if (config.kafkaEnabled) {
+    const kafka = createKafkaClient(config.kafkaBrokers, config.kafkaClientId);
+    stockReleaseConsumer = new StockReleaseConsumer(
+      kafka,
+      config.kafkaGroupId,
+      config.kafkaStockReleaseTopic,
+      stockRepository,
+    );
+    await stockReleaseConsumer.start();
+  } else {
+    console.log('Kafka disabled — stock release consumer not started.');
+  }
 
   const expireReservations = new ExpireStaleReservationsUseCase(stockRepository);
   const expiryInterval = setInterval(async () => {
@@ -112,7 +124,9 @@ async function bootstrap(): Promise<void> {
     clearInterval(expiryInterval);
     server.close();
     await grpcServer.stop();
-    await stockReleaseConsumer.stop();
+    if (stockReleaseConsumer) {
+      await stockReleaseConsumer.stop();
+    }
     await redis.quit();
     await prisma.$disconnect();
     process.exit(0);

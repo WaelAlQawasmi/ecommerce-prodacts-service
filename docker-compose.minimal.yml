@@ -1,0 +1,12 @@
+# Minimal stack for small instances (~1GB RAM): Postgres + Redis + app only.
+# Search uses PostgreSQL; Kafka stock-release consumer is disabled.
+#
+# Used automatically by scripts/start-production.sh when RAM < 2GB.
+# Manual use:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.minimal.yml docker compose up -d
+
+services:
+  products-service:
+    environment:
+      ELASTICSEARCH_ENABLED: "false"
+      KAFKA_ENABLED: "false"

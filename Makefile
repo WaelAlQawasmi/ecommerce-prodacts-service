@@ -92,7 +92,7 @@ setup: env install generate infra-up migrate-dev seed
 	@echo "Setup complete. Run 'make dev' to start the service."
 
 infra-up:
-	$(DOCKER_COMPOSE) up -d postgres redis elasticsearch kafka
+	$(DOCKER_COMPOSE) --profile full up -d postgres redis elasticsearch kafka
 
 infra-down:
 	$(DOCKER_COMPOSE) stop postgres redis elasticsearch kafka
@@ -117,11 +117,11 @@ docker-seed: docker-wait-postgres
 
 docker-up: docker-env-check
 	@echo "==> Pulling infrastructure images..."
-	@$(DOCKER_COMPOSE) pull postgres redis elasticsearch kafka
+	@$(DOCKER_COMPOSE) --profile full pull postgres redis elasticsearch kafka
 	@echo "==> Building products-service..."
 	@$(DOCKER_COMPOSE) build products-service
 	@echo "==> Starting infrastructure (Postgres, Redis, Elasticsearch, Kafka)..."
-	@$(DOCKER_COMPOSE) up -d postgres redis elasticsearch kafka
+	@$(DOCKER_COMPOSE) --profile full up -d postgres redis elasticsearch kafka
 	@$(MAKE) docker-migrate
 	@$(MAKE) docker-seed
 	@echo "==> Starting products-service..."

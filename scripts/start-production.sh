@@ -73,17 +73,36 @@ if ! $DOCKER_COMPOSE version >/dev/null 2>&1; then
   exit 1
 fi
 
+COMPOSE_PROFILES=""
+INFRA_SERVICES="postgres redis"
+
 if [[ -z "${COMPOSE_FILE:-}" ]] && command -v free >/dev/null 2>&1; then
   total_mb=$(free -m | awk '/^Mem:/{print $2}')
   if [[ "$total_mb" -lt 2048 ]]; then
-    export COMPOSE_FILE="docker-compose.yml:docker-compose.small.yml"
-    echo "Low memory detected (${total_mb}MB RAM) — using docker-compose.small.yml"
-    echo "Tip: use a 4GB+ instance for production, or add 2GB swap (see README)."
+    export COMPOSE_FILE="docker-compose.yml:docker-compose.minimal.yml"
+    export ELASTICSEARCH_ENABLED=false
+    export KAFKA_ENABLED=false
+    echo "Low memory (${total_mb}MB RAM) — minimal mode: Postgres + Redis only."
+    echo "Search uses PostgreSQL. Kafka stock-release events are disabled."
+    echo "Use a 4GB+ instance with --profile full for Elasticsearch and Kafka."
   fi
 fi
 
+if [[ "${COMPOSE_FILE:-}" != *"minimal"* ]] && [[ -z "$COMPOSE_PROFILES" ]]; then
+  COMPOSE_PROFILES="full"
+  INFRA_SERVICES="postgres redis elasticsearch kafka"
+fi
+
+compose() {
+  if [[ -n "$COMPOSE_PROFILES" ]]; then
+    COMPOSE_PROFILES="$COMPOSE_PROFILES" $DOCKER_COMPOSE "$@"
+  else
+    $DOCKER_COMPOSE "$@"
+  fi
+}
+
 check_disk_space() {
-  local min_mb="${1:-4096}"
+  local min_mb="${1:-2048}"
   local avail_kb avail_mb
   avail_kb=$(df -Pk . | awk 'NR==2 {print $4}')
   avail_mb=$((avail_kb / 1024))
@@ -97,35 +116,35 @@ check_disk_space() {
   echo "Disk space OK: ${avail_mb}MB free."
 }
 
-check_disk_space 4096
+check_disk_space 2048
 
 echo "==> Pulling infrastructure images..."
-$DOCKER_COMPOSE pull postgres redis elasticsearch kafka
+compose pull $INFRA_SERVICES
 
 echo "==> Building products-service image (NODE_ENV=production)..."
-$DOCKER_COMPOSE build --build-arg NODE_ENV=production products-service
+compose build --build-arg NODE_ENV=production products-service
 
-echo "==> Starting infrastructure (Postgres, Redis, Elasticsearch, Kafka)..."
-$DOCKER_COMPOSE up -d postgres redis elasticsearch kafka
+echo "==> Starting infrastructure..."
+compose up -d $INFRA_SERVICES
 
 echo "==> Waiting for PostgreSQL..."
-$DOCKER_COMPOSE exec -T postgres sh -c \
+compose exec -T postgres sh -c \
   'until pg_isready -U products -d products_db >/dev/null 2>&1; do sleep 2; done'
 
 echo "==> Applying database migrations..."
-$DOCKER_COMPOSE run --rm --no-deps \
+compose run --rm --no-deps \
   -e DATABASE_URL=postgresql://products:products_secret@postgres:5432/products_db?schema=public \
   products-service npx prisma migrate deploy
 
 if [[ "$SEED" == true ]]; then
   echo "==> Seeding database..."
-  $DOCKER_COMPOSE run --rm --no-deps \
+  compose run --rm --no-deps \
     -e DATABASE_URL=postgresql://products:products_secret@postgres:5432/products_db?schema=public \
     products-service sh -c "npx tsx prisma/seed.ts"
 fi
 
 echo "==> Starting products-service..."
-$DOCKER_COMPOSE up -d products-service
+compose up -d products-service
 
 PORT="${PORT:-3001}"
 GRPC_PORT="${GRPC_PORT:-50051}"

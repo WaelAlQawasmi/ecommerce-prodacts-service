@@ -12,8 +12,10 @@ export interface AppConfig {
   databaseUrl: string;
   redisUrl: string;
   stockReservationTtlSeconds: number;
+  elasticsearchEnabled: boolean;
   elasticsearchNode: string;
   elasticsearchIndex: string;
+  kafkaEnabled: boolean;
   kafkaBrokers: string[];
   kafkaClientId: string;
   kafkaGroupId: string;
@@ -38,6 +40,8 @@ function parsePublicKey(raw: string): string {
 
 export function loadConfig(): AppConfig {
   const nodeEnv = process.env.NODE_ENV ?? 'development';
+  const elasticsearchEnabled = parseBoolean(process.env.ELASTICSEARCH_ENABLED, true);
+  const kafkaEnabled = parseBoolean(process.env.KAFKA_ENABLED, true);
 
   return {
     port: parseInt(process.env.PORT ?? '3001', 10),
@@ -49,8 +53,12 @@ export function loadConfig(): AppConfig {
       process.env.STOCK_RESERVATION_TTL_SECONDS ?? '900',
       10,
     ),
-    elasticsearchNode: requireEnv('ELASTICSEARCH_NODE'),
+    elasticsearchEnabled,
+    elasticsearchNode: elasticsearchEnabled
+      ? requireEnv('ELASTICSEARCH_NODE')
+      : (process.env.ELASTICSEARCH_NODE ?? 'http://localhost:9200'),
     elasticsearchIndex: process.env.ELASTICSEARCH_INDEX ?? 'products',
+    kafkaEnabled,
     kafkaBrokers: (process.env.KAFKA_BROKERS ?? 'localhost:9092').split(','),
     kafkaClientId: process.env.KAFKA_CLIENT_ID ?? 'products-service',
     kafkaGroupId: process.env.KAFKA_GROUP_ID ?? 'products-service-group',

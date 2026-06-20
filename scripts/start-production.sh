@@ -34,9 +34,18 @@ export NODE_ENV=production
 export SWAGGER_ENABLED="${SWAGGER_ENABLED:-false}"
 
 echo "==> Production environment check..."
-node scripts/check-production-env.js
+bash scripts/check-production-env.sh
 
 if [[ "$MODE" == "local" ]]; then
+  if ! command -v node >/dev/null 2>&1; then
+    echo "Node.js 20+ is required for --local mode. Install Node or run without --local (Docker mode)." >&2
+    exit 1
+  fi
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "npm is required for --local mode." >&2
+    exit 1
+  fi
+
   echo "==> Installing production dependencies..."
   npm ci --omit=dev
 
@@ -53,7 +62,16 @@ if [[ "$MODE" == "local" ]]; then
   exec npm start
 fi
 
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Docker is required. Install Docker or use --local with Node.js 20+." >&2
+  exit 1
+fi
+
 DOCKER_COMPOSE="${DOCKER_COMPOSE:-docker compose}"
+if ! $DOCKER_COMPOSE version >/dev/null 2>&1; then
+  echo "Docker Compose plugin is required (docker compose)." >&2
+  exit 1
+fi
 
 echo "==> Pulling infrastructure images..."
 $DOCKER_COMPOSE pull postgres redis elasticsearch kafka

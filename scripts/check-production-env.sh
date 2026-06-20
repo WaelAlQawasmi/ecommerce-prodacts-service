@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# Validates .env for production — no Node.js required.
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+PLACEHOLDER='YOUR_RSA_PUBLIC_KEY_HERE'
+REQUIRED=(DATABASE_URL REDIS_URL ELASTICSEARCH_NODE PASSPORT_PUBLIC_KEY)
+
+if [[ ! -f .env ]]; then
+  echo 'Missing .env — copy .env.example and set production values.' >&2
+  exit 1
+fi
+
+get_env() {
+  local key="$1"
+  local line value
+  line=$(grep -E "^${key}=" .env | tail -n 1 | sed 's/\r$//' || true)
+  if [[ -z "$line" ]]; then
+    return 1
+  fi
+  value="${line#*=}"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
+
+failed=false
+
+for key in "${REQUIRED[@]}"; do
+  if ! value="$(get_env "$key")"; then
+    echo "Missing required variable: ${key}" >&2
+    failed=true
+    continue
+  fi
+  if [[ -z "$value" ]]; then
+    echo "Missing required variable: ${key}" >&2
+    failed=true
+  elif [[ "$key" == "PASSPORT_PUBLIC_KEY" && "$value" == *"$PLACEHOLDER"* ]]; then
+    echo 'PASSPORT_PUBLIC_KEY still contains the placeholder — set your Auth Service RSA public key.' >&2
+    failed=true
+  fi
+done
+
+if [[ "$failed" == true ]]; then
+  exit 1
+fi
+
+node_env="$(get_env NODE_ENV || true)"
+if [[ "$node_env" != "production" ]]; then
+  echo 'Warning: NODE_ENV is not "production" in .env — the start script will export NODE_ENV=production.'
+fi
+
+echo 'Production environment check passed.'

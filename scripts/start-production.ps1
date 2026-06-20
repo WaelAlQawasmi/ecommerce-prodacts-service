@@ -31,10 +31,17 @@ if (-not $env:SWAGGER_ENABLED) {
 }
 
 Write-Host "==> Production environment check..."
-node scripts/check-production-env.js
+& "$Root\scripts\check-production-env.ps1"
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 if ($Local) {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Write-Error "Node.js 20+ is required for -Local mode. Install Node or run without -Local (Docker mode)."
+    }
+    if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
+        Write-Error "npm is required for -Local mode."
+    }
+
     Write-Host "==> Installing production dependencies..."
     npm ci --omit=dev
 

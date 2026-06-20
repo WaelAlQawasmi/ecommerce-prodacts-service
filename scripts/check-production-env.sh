@@ -10,7 +10,24 @@ PLACEHOLDER='YOUR_RSA_PUBLIC_KEY_HERE'
 REQUIRED=(DATABASE_URL REDIS_URL ELASTICSEARCH_NODE PASSPORT_PUBLIC_KEY)
 
 if [[ ! -f .env ]]; then
-  echo 'Missing .env — copy .env.example and set production values.' >&2
+  if [[ ! -f .env.example ]]; then
+    echo 'Missing .env and .env.example — cannot continue.' >&2
+    exit 1
+  fi
+  cp .env.example .env
+  if grep -q '^NODE_ENV=' .env; then
+    sed -i 's/^NODE_ENV=.*/NODE_ENV=production/' .env
+  else
+    echo 'NODE_ENV=production' >> .env
+  fi
+  if grep -q '^SWAGGER_ENABLED=' .env; then
+    sed -i 's/^SWAGGER_ENABLED=.*/SWAGGER_ENABLED=false/' .env
+  else
+    echo 'SWAGGER_ENABLED=false' >> .env
+  fi
+  echo "Created .env from .env.example at: ${ROOT}/.env"
+  echo 'Set production values (especially PASSPORT_PUBLIC_KEY), then run this script again.'
+  echo "  nano ${ROOT}/.env"
   exit 1
 fi
 

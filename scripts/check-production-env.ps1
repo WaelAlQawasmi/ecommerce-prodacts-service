@@ -9,7 +9,25 @@ $Placeholder = "YOUR_RSA_PUBLIC_KEY_HERE"
 $Required = @("DATABASE_URL", "REDIS_URL", "ELASTICSEARCH_NODE", "PASSPORT_PUBLIC_KEY")
 
 if (-not (Test-Path ".env")) {
-    Write-Error "Missing .env — copy .env.example and set production values."
+    if (-not (Test-Path ".env.example")) {
+        Write-Error "Missing .env and .env.example — cannot continue."
+    }
+    Copy-Item ".env.example" ".env"
+    $envContent = Get-Content ".env" -Raw
+    if ($envContent -match '(?m)^NODE_ENV=') {
+        $envContent = $envContent -replace '(?m)^NODE_ENV=.*', 'NODE_ENV=production'
+    } else {
+        $envContent += "`nNODE_ENV=production"
+    }
+    if ($envContent -match '(?m)^SWAGGER_ENABLED=') {
+        $envContent = $envContent -replace '(?m)^SWAGGER_ENABLED=.*', 'SWAGGER_ENABLED=false'
+    } else {
+        $envContent += "`nSWAGGER_ENABLED=false"
+    }
+    Set-Content ".env" $envContent -NoNewline
+    Write-Host "Created .env from .env.example at: $Root\.env"
+    Write-Host "Set production values (especially PASSPORT_PUBLIC_KEY), then run this script again."
+    exit 1
 }
 
 function Get-EnvValue {

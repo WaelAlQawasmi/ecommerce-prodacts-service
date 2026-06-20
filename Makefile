@@ -1,7 +1,7 @@
 .PHONY: help install build dev start test test-watch test-coverage lint \
 	generate migrate migrate-dev seed setup env docker-env-check \
 	infra-up infra-down docker-up docker-down docker-build docker-logs docker-restart \
-	docker-migrate docker-seed clean
+	docker-migrate docker-seed prod-up prod-local clean
 
 NPM ?= npm
 DOCKER_COMPOSE ?= docker compose
@@ -40,6 +40,8 @@ help:
 	@echo "    make docker-seed   Seed database inside Docker"
 	@echo "    make docker-logs   Tail products-service logs"
 	@echo "    make docker-restart Rebuild and restart full stack"
+	@echo "    make prod-up       Production start (Docker: build, migrate, app — no seed)"
+	@echo "    make prod-local    Production start on host (npm ci, build, migrate, start)"
 	@echo ""
 	@echo "  Cleanup"
 	@echo "    make clean         Remove dist/ and coverage/"
@@ -142,6 +144,12 @@ docker-logs:
 	$(DOCKER_COMPOSE) logs -f products-service
 
 docker-restart: docker-down docker-up
+
+prod-up:
+	bash scripts/start-production.sh
+
+prod-local:
+	bash scripts/start-production.sh --local
 
 clean:
 	node -e "const fs=require('fs'); ['dist','coverage'].forEach(d=>fs.rmSync(d,{recursive:true,force:true}))"

@@ -94,6 +94,19 @@ describe('HTTP API', () => {
       expect(res.status).toBe(204);
       expect(res.headers['access-control-allow-origin']).toBe(cloudfrontOrigin);
     });
+
+    it('should include cross-origin resource policy on responses', async () => {
+      process.env.CORS_ORIGINS = cloudfrontOrigin;
+      const corsApp = buildApp();
+
+      const res = await request(corsApp)
+        .get('/health')
+        .set('Origin', cloudfrontOrigin);
+
+      expect(res.status).toBe(200);
+      expect(res.headers['access-control-allow-origin']).toBe(cloudfrontOrigin);
+      expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    });
   });
 
   describe('Authentication', () => {

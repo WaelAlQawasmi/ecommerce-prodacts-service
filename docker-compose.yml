@@ -4,6 +4,8 @@ services:
       context: .
       args:
         NODE_ENV: ${NODE_ENV:-development}
+    env_file:
+      - .env
     ports:
       - "${PORT:-3001}:${PORT:-3001}"
       - "${GRPC_PORT:-50051}:${GRPC_PORT:-50051}"

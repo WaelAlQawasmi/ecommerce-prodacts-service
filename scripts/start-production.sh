@@ -31,7 +31,7 @@ for arg in "$@"; do
 done
 
 export NODE_ENV=production
-export SWAGGER_ENABLED="${SWAGGER_ENABLED:-false}"
+# Do not override SWAGGER_ENABLED here — read from .env via docker compose env_file / interpolation.
 
 echo "==> Production environment check..."
 bash scripts/check-production-env.sh
@@ -149,10 +149,15 @@ compose up -d products-service
 PORT="${PORT:-3001}"
 GRPC_PORT="${GRPC_PORT:-50051}"
 
+swagger_status="disabled (default for NODE_ENV=production)"
+if grep -qE '^SWAGGER_ENABLED=(true|1)' .env 2>/dev/null; then
+  swagger_status="enabled at http://localhost:${PORT}/api/docs"
+fi
+
 echo ""
 echo "Production stack is running."
 echo "  HTTP API:  http://localhost:${PORT}"
 echo "  gRPC:      localhost:${GRPC_PORT}"
-echo "  Swagger:   disabled (SWAGGER_ENABLED=false)"
+echo "  Swagger:   ${swagger_status}"
 echo ""
 echo "Logs: $DOCKER_COMPOSE logs -f products-service"

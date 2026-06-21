@@ -26,9 +26,7 @@ $Root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 Set-Location $Root
 
 $env:NODE_ENV = "production"
-if (-not $env:SWAGGER_ENABLED) {
-    $env:SWAGGER_ENABLED = "false"
-}
+# Do not override SWAGGER_ENABLED — use value from .env
 
 Write-Host "==> Production environment check..."
 & "$Root\scripts\check-production-env.ps1"
@@ -99,10 +97,18 @@ Invoke-Expression "$DockerCompose up -d products-service"
 $Port = if ($env:PORT) { $env:PORT } else { "3001" }
 $GrpcPort = if ($env:GRPC_PORT) { $env:GRPC_PORT } else { "50051" }
 
+$swaggerStatus = "disabled (default for NODE_ENV=production)"
+if (Test-Path ".env") {
+    $swaggerLine = Select-String -Path ".env" -Pattern "^SWAGGER_ENABLED=(true|1)" | Select-Object -Last 1
+    if ($swaggerLine) {
+        $swaggerStatus = "enabled at http://localhost:$Port/api/docs"
+    }
+}
+
 Write-Host ""
 Write-Host "Production stack is running."
 Write-Host "  HTTP API:  http://localhost:$Port"
 Write-Host "  gRPC:      localhost:$GrpcPort"
-Write-Host "  Swagger:   disabled (SWAGGER_ENABLED=false)"
+Write-Host "  Swagger:   $swaggerStatus"
 Write-Host ""
 Write-Host "Logs: $DockerCompose logs -f products-service"

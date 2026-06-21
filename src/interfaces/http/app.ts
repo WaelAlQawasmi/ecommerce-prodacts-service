@@ -1,4 +1,5 @@
 import express from 'express';
+import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import swaggerUi from 'swagger-ui-express';
@@ -51,6 +52,16 @@ export interface HttpDependencies {
 export function createHttpApp(deps: HttpDependencies): express.Application {
   const app = express();
   const auth = createAuthMiddleware(deps.jwtVerifier);
+
+  if (deps.config.corsOrigins.length > 0) {
+    app.use(
+      cors({
+        origin: deps.config.corsOrigins,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+      }),
+    );
+  }
 
   // Disable upgrade-insecure-requests so Swagger UI assets load over plain HTTP
   // (e.g. EC2 on port 3001 without TLS). Helmet enables it by default and breaks /api/docs.

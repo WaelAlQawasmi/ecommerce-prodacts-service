@@ -22,8 +22,20 @@ export interface AppConfig {
   kafkaStockReleaseTopic: string;
   passportPublicKey: string;
   swaggerEnabled: boolean;
+  corsOrigins: string[];
   rateLimitWindowMs: number;
   rateLimitMax: number;
+}
+
+function parseCorsOrigins(value: string | undefined): string[] {
+  if (!value?.trim()) {
+    return [];
+  }
+
+  return value
+    .split(',')
+    .map((origin) => origin.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
 }
 
 function requireEnv(key: string): string {
@@ -68,6 +80,7 @@ export function loadConfig(): AppConfig {
       process.env.SWAGGER_ENABLED,
       nodeEnv !== 'production',
     ),
+    corsOrigins: parseCorsOrigins(process.env.CORS_ORIGINS),
     rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS ?? '60000', 10),
     rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX ?? '100', 10),
   };

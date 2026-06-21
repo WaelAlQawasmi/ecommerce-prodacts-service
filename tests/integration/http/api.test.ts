@@ -69,6 +69,33 @@ describe('HTTP API', () => {
     });
   });
 
+  describe('CORS', () => {
+    const cloudfrontOrigin = 'https://d2qagfb46siin2.cloudfront.net';
+    const originalCorsOrigins = process.env.CORS_ORIGINS;
+
+    afterAll(() => {
+      if (originalCorsOrigins === undefined) {
+        delete process.env.CORS_ORIGINS;
+      } else {
+        process.env.CORS_ORIGINS = originalCorsOrigins;
+      }
+    });
+
+    it('should allow preflight from configured origin', async () => {
+      process.env.CORS_ORIGINS = cloudfrontOrigin;
+      const corsApp = buildApp();
+
+      const res = await request(corsApp)
+        .options('/api/v1/products')
+        .set('Origin', cloudfrontOrigin)
+        .set('Access-Control-Request-Method', 'GET')
+        .set('Access-Control-Request-Headers', 'authorization');
+
+      expect(res.status).toBe(204);
+      expect(res.headers['access-control-allow-origin']).toBe(cloudfrontOrigin);
+    });
+  });
+
   describe('Authentication', () => {
     it('should reject requests without token', async () => {
       const res = await request(app).get('/api/v1/products');

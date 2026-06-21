@@ -52,7 +52,17 @@ export function createHttpApp(deps: HttpDependencies): express.Application {
   const app = express();
   const auth = createAuthMiddleware(deps.jwtVerifier);
 
-  app.use(helmet());
+  // Disable upgrade-insecure-requests so Swagger UI assets load over plain HTTP
+  // (e.g. EC2 on port 3001 without TLS). Helmet enables it by default and breaks /api/docs.
+  app.use(
+    helmet({
+      contentSecurityPolicy: {
+        directives: {
+          upgradeInsecureRequests: null,
+        },
+      },
+    }),
+  );
   app.use(express.json({ limit: '1mb' }));
   app.use(
     rateLimit({
